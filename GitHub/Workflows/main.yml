@@ -1,0 +1,52 @@
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+name: Example
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout 
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: 'Azure Login'
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: 'Azure Registry Login'
+      uses: azure/CLI@v1
+      with:
+        azcliversion: 2.31.0
+        inlineScript: |
+          ACR_TOKEN=$(az acr login --name mscae --expose-token --query accessToken --output tsv)
+          echo "ACR_TOKEN=$ACR_TOKEN" >> $GITHUB_ENV
+    - name: 'Docker Login'
+      uses: azure/docker-login@v1
+      with:
+        login-server: <name>.azurecr.io
+        username: 00000000-0000-0000-0000-000000000000
+        password: ${{ env.ACR_TOKEN }}
+
+    - name: 'Docker Push'
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: <name>.azurecr.io/helloworld:latest
